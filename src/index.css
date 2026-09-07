@@ -196,6 +196,23 @@ input:focus, textarea:focus, select:focus {
   align-self: flex-start;
 }
 
+.admin-dialog {
+  width: min(100%, 440px);
+}
+
+.admin-dialog-message {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.admin-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;

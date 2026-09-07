@@ -20,8 +20,9 @@ export default function AdminDashboard() {
         content: '',
         resource_url: ''
     });
-    const [lectureFilterClassId, setLectureFilterClassId] = useState('');
     const [modal, setModal] = useState(null);
+    const [confirmation, setConfirmation] = useState(null);
+    const [notice, setNotice] = useState(null);
     const [showUserPassword, setShowUserPassword] = useState(false);
 
     const token = localStorage.getItem('token');
@@ -78,6 +79,12 @@ export default function AdminDashboard() {
             content: '',
             resource_url: ''
         });
+    };
+
+    const openLectureForClass = (classId) => {
+        resetLectureForm();
+        setLectureForm((current) => ({ ...current, class_id: String(classId) }));
+        setModal('lecture');
     };
 
     const resetUserForm = () => {
@@ -143,7 +150,10 @@ export default function AdminDashboard() {
         fetchLectures();
         fetchLectureProgress();
         setModal(null);
-        alert(lectureForm.id ? 'Lecture updated' : 'Lecture added');
+        setNotice({
+            title: lectureForm.id ? 'Lecture updated' : 'Lecture added',
+            message: lectureForm.id ? 'The lecture changes have been saved.' : 'The lecture has been added to this class.'
+        });
     };
 
     const handleEditLecture = (lecture) => {
@@ -158,10 +168,7 @@ export default function AdminDashboard() {
         setModal('lecture');
     };
 
-    const handleDeleteLecture = async (lectureId) => {
-        const confirmed = window.confirm('Delete this lecture?');
-        if (!confirmed) return;
-
+    const deleteLecture = async (lectureId) => {
         await fetch(`${API_BASE_URL}/admin/lectures.php`, {
             method: 'DELETE',
             headers,
@@ -173,6 +180,16 @@ export default function AdminDashboard() {
         }
         fetchLectures();
         fetchLectureProgress();
+        setNotice({ title: 'Lecture deleted', message: 'The lecture has been removed from the class.' });
+    };
+
+    const handleDeleteLecture = (lecture) => {
+        setConfirmation({
+            title: 'Delete lecture?',
+            message: `"${lecture.title}" will be permanently removed from this class.`,
+            confirmLabel: 'Delete Lecture',
+            onConfirm: () => deleteLecture(lecture.id)
+        });
     };
 
     const handleAssignClass = async (e) => {
@@ -184,19 +201,26 @@ export default function AdminDashboard() {
         e.target.reset();
         setModal(null);
         fetchAssignments();
-        alert('Class assigned');
+        setNotice({ title: 'Class assigned', message: 'The user can now access this class.' });
     };
 
-    const handleRemoveAssignment = async (assignment) => {
-        const confirmed = window.confirm(`Remove ${assignment.user_name}'s access to ${assignment.class_title}?`);
-        if (!confirmed) return;
-
+    const removeAssignment = async (assignment) => {
         await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
             method: 'DELETE',
             headers,
             body: JSON.stringify({ user_id: assignment.user_id, class_id: assignment.class_id })
         });
         fetchAssignments();
+        setNotice({ title: 'Access removed', message: `${assignment.user_name} can no longer access ${assignment.class_title}.` });
+    };
+
+    const handleRemoveAssignment = (assignment) => {
+        setConfirmation({
+            title: 'Remove class access?',
+            message: `${assignment.user_name} will no longer be able to open ${assignment.class_title}.`,
+            confirmLabel: 'Remove Access',
+            onConfirm: () => removeAssignment(assignment)
+        });
     };
 
     const assignmentStatus = (assignment) => {
@@ -208,13 +232,15 @@ export default function AdminDashboard() {
         return 'In progress';
     };
 
+    const lectureClass = data.classes.find((classroom) => String(classroom.id) === String(lectureForm.class_id));
+
     return (
         <div>
             <h1 className="title">Admin Panel</h1>
             <p className="subtitle">Manage users, classes, and lectures</p>
 
             <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-                {['users', 'classes', 'lectures', 'assign'].map(tab => (
+                {['users', 'classes', 'assign'].map(tab => (
                     <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'btn-primary' : 'btn-secondary'} style={{ textTransform: 'capitalize' }}>
                         {tab}
                     </button>
@@ -279,6 +305,10 @@ export default function AdminDashboard() {
                                             </span>
                                         </div>
 
+                                        <button type="button" onClick={() => openLectureForClass(classroom.id)} className="btn-primary" style={{ marginTop: '16px', padding: '8px 14px', fontSize: '0.85rem' }}>
+                                            Add Lecture
+                                        </button>
+
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
                                             {classLectures.length === 0 ? (
                                                 <p style={{ color: 'var(--text-muted)', margin: 0 }}>No lectures have been added yet.</p>
@@ -292,7 +322,7 @@ export default function AdminDashboard() {
                                                             </div>
                                                             <div style={{ display: 'flex', gap: '8px' }}>
                                                                 <button type="button" onClick={() => handleEditLecture(lecture)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>Edit</button>
-                                                                <button type="button" onClick={() => handleDeleteLecture(lecture.id)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>Delete</button>
+                                                                <button type="button" onClick={() => handleDeleteLecture(lecture)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>Delete</button>
                                                             </div>
                                                         </div>
                                                         {lecture.content && (
@@ -308,99 +338,6 @@ export default function AdminDashboard() {
                                     </section>
                                 );
                             })}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'lectures' && (
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                            <div>
-                                <h3>Lecture Content</h3>
-                                <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>
-                                    View and manage the lecture materials for every class.
-                                </p>
-                            </div>
-                            <button type="button" onClick={() => { resetLectureForm(); setModal('lecture'); }} className="btn-primary">Add Lecture</button>
-                        </div>
-
-                        <div style={{ marginTop: '28px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                <h3>Existing Lectures</h3>
-                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                    <select
-                                        value={lectureFilterClassId}
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            setLectureFilterClassId(value);
-                                        }}
-                                        style={{ minWidth: '220px' }}
-                                    >
-                                        <option value="">All Classes</option>
-                                        {data.classes.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                                    </select>
-                                    <button type="button" onClick={fetchLectures} className="btn-secondary">
-                                        Refresh
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-                                {data.lectures.filter((lecture) => !lectureFilterClassId || String(lecture.class_id) === lectureFilterClassId).length === 0 ? (
-                                    <div style={{ color: 'var(--text-muted)' }}>
-                                        No lectures found for the selected class.
-                                    </div>
-                                ) : (
-                                    data.lectures
-                                        .filter((lecture) => !lectureFilterClassId || String(lecture.class_id) === lectureFilterClassId)
-                                        .map((lecture) => (
-                                        <div key={lecture.id} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                                                <div>
-                                                    <div style={{ color: 'var(--accent-color)', fontSize: '0.85rem', marginBottom: '6px' }}>
-                                                        {lecture.class_title}
-                                                    </div>
-                                                    <h4 style={{ margin: 0 }}>{lecture.title}</h4>
-                                                    <div style={{ color: 'var(--text-muted)', marginTop: '8px', textTransform: 'capitalize' }}>
-                                                        Type: {lecture.type}
-                                                    </div>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                                    <button type="button" onClick={() => handleEditLecture(lecture)} className="btn-secondary">
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteLecture(lecture.id)}
-                                                        className="btn-secondary"
-                                                        style={{ color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {lecture.content && (
-                                                <p style={{ color: 'var(--text-muted)', marginTop: '12px', lineHeight: '1.6' }}>
-                                                    {lecture.content}
-                                                </p>
-                                            )}
-                                            {lecture.resource_url && (
-                                                <a
-                                                    href={lecture.resource_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    style={{ display: 'inline-block', marginTop: '10px', color: 'var(--accent-color)' }}
-                                                >
-                                                    Open Material
-                                                </a>
-                                            )}
-                                            <p style={{ color: 'var(--text-muted)', marginTop: '12px', fontSize: '0.88rem' }}>
-                                                Done by: {completedUsersForLecture(lecture.id).length ? completedUsersForLecture(lecture.id).map((progress) => progress.user_name).join(', ') : 'No users yet'}
-                                            </p>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
                         </div>
                     </div>
                 )}
@@ -496,10 +433,9 @@ export default function AdminDashboard() {
 
                         {modal === 'lecture' && (
                             <form onSubmit={handleLectureSubmit} className="admin-modal-form">
-                                <select name="class_id" value={lectureForm.class_id} onChange={(e) => setLectureForm({ ...lectureForm, class_id: e.target.value })} required>
-                                    <option value="">Select a Class...</option>
-                                    {data.classes.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                                </select>
+                                <p style={{ color: 'var(--accent-color)', margin: 0, fontWeight: 600 }}>
+                                    Classroom: {lectureClass?.title || 'Selected classroom'}
+                                </p>
                                 <input name="title" placeholder="Lecture Title" value={lectureForm.title} onChange={(e) => setLectureForm({ ...lectureForm, title: e.target.value })} required />
                                 <select name="type" value={lectureForm.type} onChange={(e) => setLectureForm({ ...lectureForm, type: e.target.value })} required>
                                     <option value="text">Text Content / Notes</option>
@@ -527,6 +463,41 @@ export default function AdminDashboard() {
                                 <button type="submit" className="btn-primary">Assign Class</button>
                             </form>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {confirmation && (
+                <div className="admin-modal-backdrop" role="presentation" onMouseDown={() => setConfirmation(null)}>
+                    <div className="admin-modal admin-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" onMouseDown={(e) => e.stopPropagation()}>
+                        <div className="admin-modal-header">
+                            <h3 id="confirmation-title">{confirmation.title}</h3>
+                            <button type="button" className="admin-modal-close" onClick={() => setConfirmation(null)} aria-label="Close dialog">x</button>
+                        </div>
+                        <p className="admin-dialog-message">{confirmation.message}</p>
+                        <div className="admin-dialog-actions">
+                            <button type="button" className="btn-secondary" onClick={() => setConfirmation(null)}>Cancel</button>
+                            <button type="button" className="btn-danger" onClick={async () => {
+                                const action = confirmation.onConfirm;
+                                setConfirmation(null);
+                                await action();
+                            }}>{confirmation.confirmLabel}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {notice && (
+                <div className="admin-modal-backdrop" role="presentation" onMouseDown={() => setNotice(null)}>
+                    <div className="admin-modal admin-dialog" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={(e) => e.stopPropagation()}>
+                        <div className="admin-modal-header">
+                            <h3 id="notice-title">{notice.title}</h3>
+                            <button type="button" className="admin-modal-close" onClick={() => setNotice(null)} aria-label="Close dialog">x</button>
+                        </div>
+                        <p className="admin-dialog-message">{notice.message}</p>
+                        <div className="admin-dialog-actions">
+                            <button type="button" className="btn-primary" onClick={() => setNotice(null)}>Okay</button>
+                        </div>
                     </div>
                 </div>
             )}
