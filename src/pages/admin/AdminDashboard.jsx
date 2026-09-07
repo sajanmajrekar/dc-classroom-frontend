@@ -10,7 +10,8 @@ export default function AdminDashboard() {
         email: '',
         password: '',
         role: 'user',
-        is_active: '1'
+        is_active: '1',
+        class_id: ''
     });
     const [lectureForm, setLectureForm] = useState({
         id: null,
@@ -88,21 +89,36 @@ export default function AdminDashboard() {
     };
 
     const resetUserForm = () => {
-        setUserForm({ id: null, name: '', email: '', password: '', role: 'user', is_active: '1' });
+        setUserForm({ id: null, name: '', email: '', password: '', role: 'user', is_active: '1', class_id: '' });
         setShowUserPassword(false);
     };
 
     const handleUserSubmit = async (e) => {
         e.preventDefault();
         const isEditing = Boolean(userForm.id);
-        await fetch(`${API_BASE_URL}/admin/users.php`, {
+        const { class_id: classId, ...userPayload } = userForm;
+        const response = await fetch(`${API_BASE_URL}/admin/users.php`, {
             method: isEditing ? 'PUT' : 'POST',
             headers,
-            body: JSON.stringify({ ...userForm, is_active: Number(userForm.is_active) })
+            body: JSON.stringify({ ...userPayload, is_active: Number(userForm.is_active) })
         });
+        const result = await response.json();
+
+        if (!isEditing && classId && result.user_id) {
+            await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ user_id: result.user_id, class_id: classId })
+            });
+        }
         resetUserForm();
         fetchUsers();
+        fetchAssignments();
         setModal(null);
+        setNotice({
+            title: isEditing ? 'User updated' : 'User created',
+            message: !isEditing && classId ? 'The user was created and assigned to the selected class.' : 'The user details have been saved.'
+        });
     };
 
     const handleEditUser = (user) => {
@@ -112,7 +128,8 @@ export default function AdminDashboard() {
             email: user.email || '',
             password: '',
             role: user.role || 'user',
-            is_active: String(user.is_active)
+            is_active: String(user.is_active),
+            class_id: ''
         });
         setShowUserPassword(false);
         setModal('user');
@@ -125,6 +142,23 @@ export default function AdminDashboard() {
             body: JSON.stringify({ id: user.id, is_active: user.is_active ? 0 : 1 })
         });
         fetchUsers();
+    };
+
+    const assignedClassesForUser = (userId) => (
+        data.assignments.filter((assignment) => String(assignment.user_id) === String(userId))
+    );
+
+    const handleAssignClassToUser = async () => {
+        if (!userForm.id || !userForm.class_id) return;
+
+        await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ user_id: userForm.id, class_id: userForm.class_id })
+        });
+        setUserForm((current) => ({ ...current, class_id: '' }));
+        fetchAssignments();
+        setNotice({ title: 'Class assigned', message: 'The user can now access the selected class.' });
     };
 
     const handleCreateClass = async (e) => {
@@ -418,6 +452,39 @@ export default function AdminDashboard() {
                                     <option value="1">Active - can access classroom</option>
                                     <option value="0">Inactive - access blocked</option>
                                 </select>
+                                {!userForm.id && (
+                                    <select name="class_id" value={userForm.class_id} onChange={(e) => setUserForm({ ...userForm, class_id: e.target.value })}>
+                                        <option value="">Assign a class now (optional)</option>
+                                        {data.classes.map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.title}</option>)}
+                                    </select>
+                                )}
+                                {userForm.id && (
+                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '18px', marginTop: '4px' }}>
+                                        <h4 style={{ margin: 0 }}>Assigned Classes</h4>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                                            {assignedClassesForUser(userForm.id).length === 0 ? (
+                                                <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.9rem' }}>No classes assigned yet.</p>
+                                            ) : (
+                                                assignedClassesForUser(userForm.id).map((assignment) => (
+                                                    <div key={assignment.class_id} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', fontSize: '0.9rem' }}>
+                                                        {assignment.class_title}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
+                                            <select value={userForm.class_id} onChange={(e) => setUserForm({ ...userForm, class_id: e.target.value })} style={{ flex: 1, minWidth: '200px' }}>
+                                                <option value="">Select a class to assign...</option>
+                                                {data.classes
+                                                    .filter((classroom) => !assignedClassesForUser(userForm.id).some((assignment) => String(assignment.class_id) === String(classroom.id)))
+                                                    .map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.title}</option>)}
+                                            </select>
+                                            <button type="button" onClick={handleAssignClassToUser} disabled={!userForm.class_id} className="btn-secondary" style={{ opacity: userForm.class_id ? 1 : 0.55 }}>
+                                                Assign Class
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.5' }}>Passwords are securely protected and cannot be viewed. Enter a new password here to reset it.</p>
                                 <button type="submit" className="btn-primary">{userForm.id ? 'Save User Changes' : 'Add User'}</button>
                             </form>
