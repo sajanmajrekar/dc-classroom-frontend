@@ -71,6 +71,8 @@ export default function AdminDashboard() {
         data.progress.filter((progress) => String(progress.lecture_id) === String(lectureId))
     );
 
+    const isUserActive = (user) => Number(user.is_active) === 1;
+
     const resetLectureForm = () => {
         setLectureForm({
             id: null,
@@ -136,12 +138,42 @@ export default function AdminDashboard() {
     };
 
     const handleUserStatus = async (user) => {
-        await fetch(`${API_BASE_URL}/admin/users.php`, {
+        const nextStatus = isUserActive(user) ? 0 : 1;
+        const response = await fetch(`${API_BASE_URL}/admin/users.php`, {
             method: 'PUT',
             headers,
-            body: JSON.stringify({ id: user.id, is_active: user.is_active ? 0 : 1 })
+            body: JSON.stringify({ id: user.id, is_active: nextStatus })
         });
+        const result = await response.json();
+        if (result.status !== 'success') return;
         fetchUsers();
+        setNotice({
+            title: nextStatus ? 'User activated' : 'User deactivated',
+            message: nextStatus ? `${user.name} can now access the classroom.` : `${user.name}'s classroom access has been blocked.`
+        });
+    };
+
+    const deleteUser = async (user) => {
+        const response = await fetch(`${API_BASE_URL}/admin/users.php`, {
+            method: 'DELETE',
+            headers,
+            body: JSON.stringify({ id: user.id })
+        });
+        const result = await response.json();
+        if (result.status !== 'success') return;
+        fetchUsers();
+        fetchAssignments();
+        fetchLectureProgress();
+        setNotice({ title: 'User deleted', message: `${user.name} and their class assignments have been removed.` });
+    };
+
+    const handleDeleteUser = (user) => {
+        setConfirmation({
+            title: 'Delete user?',
+            message: `${user.name} will be permanently deleted, including their class assignments and completion records.`,
+            confirmLabel: 'Delete User',
+            onConfirm: () => deleteUser(user)
+        });
     };
 
     const assignedClassesForUser = (userId) => (
@@ -296,15 +328,18 @@ export default function AdminDashboard() {
                                             <h4 style={{ margin: 0 }}>{user.name}</h4>
                                             <p style={{ color: 'var(--text-muted)', margin: '6px 0 0' }}>{user.email}</p>
                                         </div>
-                                        <span style={{ padding: '5px 9px', borderRadius: '999px', fontSize: '0.8rem', color: user.is_active ? '#86efac' : '#fca5a5', background: user.is_active ? 'rgba(34, 197, 94, 0.14)' : 'rgba(239, 68, 68, 0.14)' }}>
-                                            {user.is_active ? 'Active' : 'Inactive'}
+                                        <span style={{ padding: '5px 9px', borderRadius: '999px', fontSize: '0.8rem', color: isUserActive(user) ? '#86efac' : '#fca5a5', background: isUserActive(user) ? 'rgba(34, 197, 94, 0.14)' : 'rgba(239, 68, 68, 0.14)' }}>
+                                            {isUserActive(user) ? 'Active' : 'Inactive'}
                                         </span>
                                     </div>
                                     <p style={{ color: 'var(--text-muted)', margin: '14px 0', textTransform: 'capitalize' }}>Role: {user.role}</p>
                                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                         <button type="button" onClick={() => handleEditUser(user)} className="btn-secondary">Manage</button>
-                                        <button type="button" onClick={() => handleUserStatus(user)} className="btn-secondary" style={{ color: user.is_active ? 'var(--danger-color)' : '#86efac', borderColor: user.is_active ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)' }}>
-                                            {user.is_active ? 'Deactivate' : 'Activate'}
+                                        <button type="button" onClick={() => handleUserStatus(user)} className="btn-secondary" style={{ color: isUserActive(user) ? 'var(--danger-color)' : '#86efac', borderColor: isUserActive(user) ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)' }}>
+                                            {isUserActive(user) ? 'Deactivate' : 'Activate'}
+                                        </button>
+                                        <button type="button" onClick={() => handleDeleteUser(user)} className="btn-secondary" style={{ color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                                            Delete User
                                         </button>
                                     </div>
                                 </article>
