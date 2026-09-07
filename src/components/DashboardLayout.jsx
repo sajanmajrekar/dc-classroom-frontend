@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, LogOut, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import digichefsLogo from '../assets/digichefs-logo.svg';
+import digichefsLogo from '../assets/digichefs-logo.png';
 
 export default function DashboardLayout() {
     const navigate = useNavigate();
