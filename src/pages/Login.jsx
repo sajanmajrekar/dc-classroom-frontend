@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../lib/api';
-import { LogIn } from 'lucide-react';
+import digichefsLogo from '../assets/digichefs-logo.png';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -35,9 +35,7 @@ export default function Login() {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px' }}>
             <div className="glass-card" style={{ maxWidth: '400px', width: '100%' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{ background: 'rgba(59, 130, 246, 0.1)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                        <LogIn size={40} color="var(--accent-color)" />
-                    </div>
+                    <img src={digichefsLogo} alt="digichefs" style={{ display: 'block', width: '190px', maxWidth: '100%', height: 'auto', margin: '0 auto 1.5rem' }} />
                     <h1 className="title">Welcome Back</h1>
                     <p className="subtitle">Sign in to your learning dashboard</p>
                 </div>
