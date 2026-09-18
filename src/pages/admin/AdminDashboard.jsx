@@ -17,9 +17,10 @@ export default function AdminDashboard() {
         id: null,
         class_id: '',
         title: '',
+        subtitle: '',
         type: 'text',
         content: '',
-        resource_url: ''
+        resources: [{ label: '', resource_url: '' }]
     });
     const [modal, setModal] = useState(null);
     const [confirmation, setConfirmation] = useState(null);
@@ -78,9 +79,10 @@ export default function AdminDashboard() {
             id: null,
             class_id: '',
             title: '',
+            subtitle: '',
             type: 'text',
             content: '',
-            resource_url: ''
+            resources: [{ label: '', resource_url: '' }]
         });
     };
 
@@ -88,6 +90,29 @@ export default function AdminDashboard() {
         resetLectureForm();
         setLectureForm((current) => ({ ...current, class_id: String(classId) }));
         setModal('lecture');
+    };
+
+    const updateLectureResource = (index, field, value) => {
+        setLectureForm((current) => ({
+            ...current,
+            resources: current.resources.map((resource, resourceIndex) => (
+                resourceIndex === index ? { ...resource, [field]: value } : resource
+            ))
+        }));
+    };
+
+    const addLectureResource = () => {
+        setLectureForm((current) => ({
+            ...current,
+            resources: [...current.resources, { label: '', resource_url: '' }]
+        }));
+    };
+
+    const removeLectureResource = (index) => {
+        setLectureForm((current) => ({
+            ...current,
+            resources: current.resources.filter((_, resourceIndex) => resourceIndex !== index)
+        }));
     };
 
     const resetUserForm = () => {
@@ -227,9 +252,12 @@ export default function AdminDashboard() {
             id: lecture.id,
             class_id: String(lecture.class_id),
             title: lecture.title || '',
+            subtitle: lecture.subtitle || '',
             type: lecture.type || 'text',
             content: lecture.content || '',
-            resource_url: lecture.resource_url || ''
+            resources: lecture.resources?.length
+                ? lecture.resources.map((resource) => ({ label: resource.label || '', resource_url: resource.resource_url || '' }))
+                : [{ label: '', resource_url: lecture.resource_url || '' }]
         });
         setModal('lecture');
     };
@@ -387,6 +415,7 @@ export default function AdminDashboard() {
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
                                                             <div>
                                                                 <h5 style={{ margin: 0, fontSize: '0.95rem' }}>{lecture.title}</h5>
+                                                                {lecture.subtitle && <p style={{ color: 'var(--text-muted)', margin: '5px 0 0', fontSize: '0.82rem' }}>{lecture.subtitle}</p>}
                                                                 <span style={{ display: 'block', color: 'var(--text-muted)', textTransform: 'capitalize', fontSize: '0.8rem', marginTop: '5px' }}>{lecture.type}</span>
                                                             </div>
                                                             <div style={{ display: 'flex', gap: '8px' }}>
@@ -400,6 +429,9 @@ export default function AdminDashboard() {
                                                         <p style={{ color: 'var(--text-muted)', margin: '10px 0 0', fontSize: '0.82rem', lineHeight: '1.45' }}>
                                                             Done by: {completedUsersForLecture(lecture.id).length ? completedUsersForLecture(lecture.id).map((progress) => progress.user_name).join(', ') : 'No users yet'}
                                                         </p>
+                                                        {lecture.resources?.length > 0 && (
+                                                            <p style={{ color: 'var(--accent-color)', margin: '8px 0 0', fontSize: '0.8rem' }}>{lecture.resources.length} resource{lecture.resources.length === 1 ? '' : 's'} attached</p>
+                                                        )}
                                                     </article>
                                                 ))
                                             )}
@@ -539,6 +571,7 @@ export default function AdminDashboard() {
                                     Classroom: {lectureClass?.title || 'Selected classroom'}
                                 </p>
                                 <input name="title" placeholder="Lecture Title" value={lectureForm.title} onChange={(e) => setLectureForm({ ...lectureForm, title: e.target.value })} required />
+                                <input name="subtitle" placeholder="Lecture Subtitle (optional)" value={lectureForm.subtitle} onChange={(e) => setLectureForm({ ...lectureForm, subtitle: e.target.value })} />
                                 <select name="type" value={lectureForm.type} onChange={(e) => setLectureForm({ ...lectureForm, type: e.target.value })} required>
                                     <option value="text">Text Content / Notes</option>
                                     <option value="youtube">YouTube Link</option>
@@ -547,7 +580,24 @@ export default function AdminDashboard() {
                                     <option value="link">Other External Link</option>
                                 </select>
                                 <textarea name="content" placeholder="Lecture notes or text content..." rows={5} value={lectureForm.content} onChange={(e) => setLectureForm({ ...lectureForm, content: e.target.value })}></textarea>
-                                <input name="resource_url" placeholder="External URL (if any)" value={lectureForm.resource_url} onChange={(e) => setLectureForm({ ...lectureForm, resource_url: e.target.value })} />
+                                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '18px', marginTop: '4px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                                        <div>
+                                            <h4 style={{ margin: 0 }}>Lecture Links</h4>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '5px 0 0' }}>Add one or more materials for this lecture.</p>
+                                        </div>
+                                        <button type="button" onClick={addLectureResource} className="btn-secondary" style={{ padding: '7px 10px', fontSize: '0.8rem' }}>Add Link</button>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {lectureForm.resources.map((resource, index) => (
+                                            <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 0.7fr) minmax(180px, 1.3fr) auto', gap: '8px', alignItems: 'center' }}>
+                                                <input placeholder="Label (optional)" value={resource.label} onChange={(e) => updateLectureResource(index, 'label', e.target.value)} />
+                                                <input type="url" placeholder="https://..." value={resource.resource_url} onChange={(e) => updateLectureResource(index, 'resource_url', e.target.value)} />
+                                                <button type="button" onClick={() => removeLectureResource(index)} className="btn-secondary" aria-label="Remove link" style={{ padding: '10px 12px', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>x</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                                 <button type="submit" className="btn-primary">{lectureForm.id ? 'Update Lecture' : 'Add Lecture'}</button>
                             </form>
                         )}

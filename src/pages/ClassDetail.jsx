@@ -86,7 +86,12 @@ export default function ClassDetail() {
                             <p style={{ color: 'var(--text-muted)' }}>No lectures available yet.</p>
                         </div>
                     ) : (
-                        lectures.map((lec, idx) => (
+                        lectures.map((lec, idx) => {
+                            const resources = lec.resources?.length
+                                ? lec.resources
+                                : lec.resource_url ? [{ label: 'Lecture material', resource_url: lec.resource_url }] : [];
+
+                            return (
                             <div key={lec.id} className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -106,20 +111,26 @@ export default function ClassDetail() {
                                         {savingLectureId === lec.id ? 'Saving...' : Number(lec.is_completed) === 1 ? 'Done' : 'Mark as Done'}
                                     </button>
                                 </div>
+                                {lec.subtitle && (
+                                    <p style={{ color: 'var(--accent-color)', margin: 0, fontSize: '0.95rem', fontWeight: 500 }}>{lec.subtitle}</p>
+                                )}
                                 {lec.content && (
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px' }}>
                                         {lec.content}
                                     </div>
                                 )}
-                                {lec.resource_url && (
-                                    <div>
-                                        <a href={lec.resource_url} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ display: 'inline-flex', padding: '8px 16px', fontSize: '0.9rem' }}>
-                                            Open Link / View Material
-                                        </a>
+                                {resources.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                        {resources.map((resource, resourceIndex) => (
+                                            <a key={resource.id || `${lec.id}-${resourceIndex}`} href={resource.resource_url} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ display: 'inline-flex', padding: '8px 16px', fontSize: '0.9rem' }}>
+                                                {resource.label || `Open Material ${resourceIndex + 1}`}
+                                            </a>
+                                        ))}
                                     </div>
                                 )}
                             </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             )}
