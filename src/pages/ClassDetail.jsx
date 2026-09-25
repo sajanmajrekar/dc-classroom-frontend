@@ -8,7 +8,7 @@ export default function ClassDetail() {
     const navigate = useNavigate();
     const [lectures, setLectures] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [savingLectureId, setSavingLectureId] = useState(null);
+    const [savingResourceId, setSavingResourceId] = useState(null);
 
     useEffect(() => {
         const fetchLectures = async () => {
@@ -41,10 +41,12 @@ export default function ClassDetail() {
         }
     };
 
-    const toggleLectureCompletion = async (lecture) => {
-        const completed = Number(lecture.is_completed) !== 1;
+    const toggleResourceCompletion = async (lectureId, resource) => {
+        if (!resource.id) return;
+
+        const completed = Number(resource.is_completed) !== 1;
         const token = localStorage.getItem('token');
-        setSavingLectureId(lecture.id);
+        setSavingResourceId(resource.id);
 
         try {
             const res = await fetch(`${API_BASE_URL}/user/lecture_progress.php`, {
@@ -53,18 +55,25 @@ export default function ClassDetail() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ lecture_id: lecture.id, completed })
+                body: JSON.stringify({ resource_id: resource.id, completed })
             });
             const data = await res.json();
             if (data.status === 'success') {
-                setLectures((current) => current.map((item) => (
-                    item.id === lecture.id ? { ...item, is_completed: completed ? 1 : 0 } : item
+                setLectures((current) => current.map((lecture) => (
+                    lecture.id === lectureId
+                        ? {
+                            ...lecture,
+                            resources: lecture.resources.map((item) => (
+                                item.id === resource.id ? { ...item, is_completed: completed ? 1 : 0 } : item
+                            ))
+                        }
+                        : lecture
                 )));
             }
         } catch (e) {
             console.error(e);
         } finally {
-            setSavingLectureId(null);
+            setSavingResourceId(null);
         }
     };
 
@@ -96,20 +105,10 @@ export default function ClassDetail() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         {getIconForType(lec.type)}
-                                        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>
+                                        <h3 style={{ margin: 0, fontSize: '24px', color: '#fff' }}>
                                             Lecture {String(idx + 1).padStart(2, '0')} &ndash; {lec.title}
                                         </h3>
                                     </div>
-                                    <button
-                                        type="button"
-                                        className={Number(lec.is_completed) === 1 ? 'btn-secondary' : 'btn-primary'}
-                                        onClick={() => toggleLectureCompletion(lec)}
-                                        disabled={savingLectureId === lec.id}
-                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 14px', opacity: savingLectureId === lec.id ? 0.7 : 1 }}
-                                    >
-                                        {Number(lec.is_completed) === 1 ? <CheckCircle size={17} /> : <Circle size={17} />}
-                                        {savingLectureId === lec.id ? 'Saving...' : Number(lec.is_completed) === 1 ? 'Done' : 'Mark as Done'}
-                                    </button>
                                 </div>
                                 {lec.subtitle && (
                                     <p style={{ color: 'var(--accent-color)', margin: 0, fontSize: '0.95rem', fontWeight: 500 }}>{lec.subtitle}</p>
@@ -120,12 +119,28 @@ export default function ClassDetail() {
                                     </div>
                                 )}
                                 {resources.length > 0 && (
-                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                        {resources.map((resource, resourceIndex) => (
-                                            <a key={resource.id || `${lec.id}-${resourceIndex}`} href={resource.resource_url} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ display: 'inline-flex', padding: '8px 16px', fontSize: '0.9rem' }}>
-                                                {resource.label || `Open Material ${resourceIndex + 1}`}
-                                            </a>
-                                        ))}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {resources.map((resource, resourceIndex) => {
+                                            const isCompleted = Number(resource.is_completed) === 1;
+                                            const isSaving = savingResourceId === resource.id;
+                                            return (
+                                                <div key={resource.id || `${lec.id}-${resourceIndex}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', padding: '10px 12px', border: '1px solid var(--border-color)', borderRadius: '10px', flexWrap: 'wrap' }}>
+                                                    <a href={resource.resource_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+                                                        {resource.label || `Open Material ${resourceIndex + 1}`}
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        className={isCompleted ? 'btn-secondary' : 'btn-primary'}
+                                                        onClick={() => toggleResourceCompletion(lec.id, resource)}
+                                                        disabled={!resource.id || isSaving}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '7px 12px', opacity: !resource.id || isSaving ? 0.65 : 1 }}
+                                                    >
+                                                        {isCompleted ? <CheckCircle size={16} /> : <Circle size={16} />}
+                                                        {isSaving ? 'Saving...' : isCompleted ? 'Done' : 'Mark Done'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

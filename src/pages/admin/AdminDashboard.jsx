@@ -68,8 +68,8 @@ export default function AdminDashboard() {
         if (json.data) setData(d => ({ ...d, assignments: json.data }));
     };
 
-    const completedUsersForLecture = (lectureId) => (
-        data.progress.filter((progress) => String(progress.lecture_id) === String(lectureId))
+    const completedUsersForResource = (resourceId) => (
+        data.progress.filter((progress) => String(progress.resource_id) === String(resourceId))
     );
 
     const isUserActive = (user) => Number(user.is_active) === 1;
@@ -227,6 +227,30 @@ export default function AdminDashboard() {
         e.target.reset();
         fetchClasses();
         setModal(null);
+    };
+
+    const deleteClass = async (classroom) => {
+        const response = await fetch(`${API_BASE_URL}/admin/classes.php`, {
+            method: 'DELETE',
+            headers,
+            body: JSON.stringify({ id: classroom.id })
+        });
+        const result = await response.json();
+        if (result.status !== 'success') return;
+        fetchClasses();
+        fetchLectures();
+        fetchLectureProgress();
+        fetchAssignments();
+        setNotice({ title: 'Class deleted', message: `${classroom.title} and its lectures have been removed.` });
+    };
+
+    const handleDeleteClass = (classroom) => {
+        setConfirmation({
+            title: 'Delete class?',
+            message: `${classroom.title}, all of its lectures, resources, assignments, and completion records will be permanently deleted.`,
+            confirmLabel: 'Delete Class',
+            onConfirm: () => deleteClass(classroom)
+        });
     };
 
     const handleLectureSubmit = async (e) => {
@@ -402,9 +426,14 @@ export default function AdminDashboard() {
                                             </span>
                                         </div>
 
-                                        <button type="button" onClick={() => openLectureForClass(classroom.id)} className="btn-primary" style={{ marginTop: '16px', padding: '8px 14px', fontSize: '0.85rem' }}>
-                                            Add Lecture
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+                                            <button type="button" onClick={() => openLectureForClass(classroom.id)} className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                                                Add Lecture
+                                            </button>
+                                            <button type="button" onClick={() => handleDeleteClass(classroom)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                                                Delete Class
+                                            </button>
+                                        </div>
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
                                             {classLectures.length === 0 ? (
@@ -426,11 +455,19 @@ export default function AdminDashboard() {
                                                         {lecture.content && (
                                                             <p style={{ color: 'var(--text-muted)', margin: '10px 0 0', fontSize: '0.88rem', lineHeight: '1.45' }}>{lecture.content}</p>
                                                         )}
-                                                        <p style={{ color: 'var(--text-muted)', margin: '10px 0 0', fontSize: '0.82rem', lineHeight: '1.45' }}>
-                                                            Done by: {completedUsersForLecture(lecture.id).length ? completedUsersForLecture(lecture.id).map((progress) => progress.user_name).join(', ') : 'No users yet'}
-                                                        </p>
                                                         {lecture.resources?.length > 0 && (
-                                                            <p style={{ color: 'var(--accent-color)', margin: '8px 0 0', fontSize: '0.8rem' }}>{lecture.resources.length} resource{lecture.resources.length === 1 ? '' : 's'} attached</p>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginTop: '12px' }}>
+                                                                {lecture.resources.map((resource, resourceIndex) => (
+                                                                    <div key={resource.id || resourceIndex} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.82rem' }}>
+                                                                        <a href={resource.resource_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+                                                                            {resource.label || `Open Material ${resourceIndex + 1}`}
+                                                                        </a>
+                                                                        <span style={{ color: 'var(--text-muted)' }}>
+                                                                            Done by: {completedUsersForResource(resource.id).length ? completedUsersForResource(resource.id).map((progress) => progress.user_name).join(', ') : 'No users yet'}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
                                                     </article>
                                                 ))
