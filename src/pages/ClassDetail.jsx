@@ -8,6 +8,7 @@ export default function ClassDetail() {
     const navigate = useNavigate();
     const [lectures, setLectures] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [savingResourceId, setSavingResourceId] = useState(null);
 
     useEffect(() => {
@@ -22,9 +23,14 @@ export default function ClassDetail() {
                     return;
                 }
                 const data = await res.json();
-                if (data.status === 'success') setLectures(data.data);
+                if (data.status === 'success') {
+                    setLectures(data.data);
+                } else {
+                    setError(data.message || 'Unable to load this classroom.');
+                }
             } catch (e) {
                 console.error(e);
+                setError('Unable to load this classroom. Please try again later.');
             } finally {
                 setLoading(false);
             }
@@ -88,6 +94,10 @@ export default function ClassDetail() {
 
             {loading ? (
                 <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+            ) : error ? (
+                <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
+                    <p style={{ color: 'var(--danger-color)' }}>{error}</p>
+                </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {lectures.length === 0 ? (
