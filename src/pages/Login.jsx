@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../lib/api';
 import digichefsLogo from '../assets/digichefs-logo.png';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -32,10 +33,12 @@ export default function Login() {
     };
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px', position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '20px', right: '20px' }}><ThemeToggle /></div>
             <div className="glass-card" style={{ maxWidth: '400px', width: '100%' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <img src={digichefsLogo} alt="digichefs" style={{ display: 'block', width: '190px', maxWidth: '100%', height: 'auto', margin: '0 auto 1.5rem' }} />
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: '-1rem', marginBottom: '1rem' }}>Academy</p>
                     <h1 className="title">Welcome Back</h1>
                     <p className="subtitle">Sign in to your learning dashboard</p>
                 </div>

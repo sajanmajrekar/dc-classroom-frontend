@@ -49,9 +49,9 @@ export default function Classrooms() {
                         classes.map(cls => (
                             <Link to={`/classrooms/${cls.id}`} key={cls.id} className="glass-card" style={{ display: 'block' }}>
                                 <div style={{ background: 'var(--accent-glow)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                                    <BookOpen size={24} color="#fff" />
+                                    <BookOpen size={24} color="var(--text-main)" />
                                 </div>
-                                <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#fff' }}>{cls.title}</h3>
+                                <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', color: 'var(--text-main)' }}>{cls.title}</h3>
                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
                                     {cls.description || 'No description provided.'}
                                 </p>

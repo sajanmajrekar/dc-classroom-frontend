@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../lib/api';
+import RichTextEditor, { RichTextContent } from '../../components/RichTextEditor';
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('users');
-    const [data, setData] = useState({ users: [], classes: [], lectures: [], progress: [], assignments: [] });
+    const [data, setData] = useState({ users: [], classes: [], lectures: [], assignments: [] });
     const [userForm, setUserForm] = useState({
         id: null,
         name: '',
@@ -11,7 +12,7 @@ export default function AdminDashboard() {
         password: '',
         role: 'user',
         is_active: '1',
-        class_id: ''
+        class_ids: []
     });
     const [lectureForm, setLectureForm] = useState({
         id: null,
@@ -26,6 +27,7 @@ export default function AdminDashboard() {
     const [confirmation, setConfirmation] = useState(null);
     const [notice, setNotice] = useState(null);
     const [showUserPassword, setShowUserPassword] = useState(false);
+    const [assignmentForm, setAssignmentForm] = useState({ user_id: '', class_ids: [] });
 
     const token = localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -34,7 +36,6 @@ export default function AdminDashboard() {
         fetchUsers();
         fetchClasses();
         fetchLectures();
-        fetchLectureProgress();
         fetchAssignments();
     }, []);
 
@@ -56,21 +57,11 @@ export default function AdminDashboard() {
         if (json.data) setData(d => ({ ...d, lectures: json.data }));
     };
 
-    const fetchLectureProgress = async () => {
-        const res = await fetch(`${API_BASE_URL}/admin/lecture_progress.php`, { headers });
-        const json = await res.json();
-        if (json.data) setData(d => ({ ...d, progress: json.data }));
-    };
-
     const fetchAssignments = async () => {
         const res = await fetch(`${API_BASE_URL}/admin/assign_class.php`, { headers });
         const json = await res.json();
         if (json.data) setData(d => ({ ...d, assignments: json.data }));
     };
-
-    const completedUsersForResource = (resourceId) => (
-        data.progress.filter((progress) => String(progress.resource_id) === String(resourceId))
-    );
 
     const isUserActive = (user) => Number(user.is_active) === 1;
 
@@ -116,14 +107,14 @@ export default function AdminDashboard() {
     };
 
     const resetUserForm = () => {
-        setUserForm({ id: null, name: '', email: '', password: '', role: 'user', is_active: '1', class_id: '' });
+        setUserForm({ id: null, name: '', email: '', password: '', role: 'user', is_active: '1', class_ids: [] });
         setShowUserPassword(false);
     };
 
     const handleUserSubmit = async (e) => {
         e.preventDefault();
         const isEditing = Boolean(userForm.id);
-        const { class_id: classId, ...userPayload } = userForm;
+        const { class_ids: classIds, ...userPayload } = userForm;
         const response = await fetch(`${API_BASE_URL}/admin/users.php`, {
             method: isEditing ? 'PUT' : 'POST',
             headers,
@@ -131,12 +122,12 @@ export default function AdminDashboard() {
         });
         const result = await response.json();
 
-        if (!isEditing && classId && result.user_id) {
-            await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+        if (!isEditing && classIds.length && result.user_id) {
+            await Promise.all(classIds.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ user_id: result.user_id, class_id: classId })
-            });
+            })));
         }
         resetUserForm();
         fetchUsers();
@@ -144,7 +135,7 @@ export default function AdminDashboard() {
         setModal(null);
         setNotice({
             title: isEditing ? 'User updated' : 'User created',
-            message: !isEditing && classId ? 'The user was created and assigned to the selected class.' : 'The user details have been saved.'
+            message: !isEditing && classIds.length ? 'The user was created and assigned to the selected classes.' : 'The user details have been saved.'
         });
     };
 
@@ -156,7 +147,7 @@ export default function AdminDashboard() {
             password: '',
             role: user.role || 'user',
             is_active: String(user.is_active),
-            class_id: ''
+            class_ids: []
         });
         setShowUserPassword(false);
         setModal('user');
@@ -188,7 +179,6 @@ export default function AdminDashboard() {
         if (result.status !== 'success') return;
         fetchUsers();
         fetchAssignments();
-        fetchLectureProgress();
         setNotice({ title: 'User deleted', message: `${user.name} and their class assignments have been removed.` });
     };
 
@@ -205,17 +195,26 @@ export default function AdminDashboard() {
         data.assignments.filter((assignment) => String(assignment.user_id) === String(userId))
     );
 
-    const handleAssignClassToUser = async () => {
-        if (!userForm.id || !userForm.class_id) return;
+    const toggleUserClassSelection = (classId) => {
+        setUserForm((current) => ({
+            ...current,
+            class_ids: current.class_ids.includes(String(classId))
+                ? current.class_ids.filter((id) => id !== String(classId))
+                : [...current.class_ids, String(classId)]
+        }));
+    };
 
-        await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+    const handleAssignClassToUser = async () => {
+        if (!userForm.id || !userForm.class_ids.length) return;
+
+        await Promise.all(userForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ user_id: userForm.id, class_id: userForm.class_id })
-        });
-        setUserForm((current) => ({ ...current, class_id: '' }));
+            body: JSON.stringify({ user_id: userForm.id, class_id: classId })
+        })));
+        setUserForm((current) => ({ ...current, class_ids: [] }));
         fetchAssignments();
-        setNotice({ title: 'Class assigned', message: 'The user can now access the selected class.' });
+        setNotice({ title: 'Classes assigned', message: 'The user can now access the selected classes.' });
     };
 
     const handleCreateClass = async (e) => {
@@ -239,7 +238,6 @@ export default function AdminDashboard() {
         if (result.status !== 'success') return;
         fetchClasses();
         fetchLectures();
-        fetchLectureProgress();
         fetchAssignments();
         setNotice({ title: 'Class deleted', message: `${classroom.title} and its lectures have been removed.` });
     };
@@ -263,7 +261,6 @@ export default function AdminDashboard() {
         });
         resetLectureForm();
         fetchLectures();
-        fetchLectureProgress();
         setModal(null);
         setNotice({
             title: lectureForm.id ? 'Lecture updated' : 'Lecture added',
@@ -297,7 +294,6 @@ export default function AdminDashboard() {
             resetLectureForm();
         }
         fetchLectures();
-        fetchLectureProgress();
         setNotice({ title: 'Lecture deleted', message: 'The lecture has been removed from the class.' });
     };
 
@@ -312,14 +308,30 @@ export default function AdminDashboard() {
 
     const handleAssignClass = async (e) => {
         e.preventDefault();
-        const fd = new FormData(e.target);
-        await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
-            method: 'POST', headers, body: JSON.stringify(Object.fromEntries(fd))
-        });
-        e.target.reset();
+        if (!assignmentForm.user_id || !assignmentForm.class_ids.length) return;
+        await Promise.all(assignmentForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ user_id: assignmentForm.user_id, class_id: classId })
+        })));
+        setAssignmentForm({ user_id: '', class_ids: [] });
         setModal(null);
         fetchAssignments();
-        setNotice({ title: 'Class assigned', message: 'The user can now access this class.' });
+        setNotice({ title: 'Classes assigned', message: 'The user can now access the selected classes.' });
+    };
+
+    const openAssignModal = () => {
+        setAssignmentForm({ user_id: '', class_ids: [] });
+        setModal('assign');
+    };
+
+    const toggleAssignmentClass = (classId) => {
+        setAssignmentForm((current) => ({
+            ...current,
+            class_ids: current.class_ids.includes(String(classId))
+                ? current.class_ids.filter((id) => id !== String(classId))
+                : [...current.class_ids, String(classId)]
+        }));
     };
 
     const removeAssignment = async (assignment) => {
@@ -339,15 +351,6 @@ export default function AdminDashboard() {
             confirmLabel: 'Remove Access',
             onConfirm: () => removeAssignment(assignment)
         });
-    };
-
-    const assignmentStatus = (assignment) => {
-        const total = Number(assignment.total_lectures);
-        const completed = Number(assignment.completed_lectures);
-        if (total === 0) return 'No lectures';
-        if (completed === 0) return 'Not started';
-        if (completed === total) return 'Complete';
-        return 'In progress';
     };
 
     const lectureClass = data.classes.find((classroom) => String(classroom.id) === String(lectureForm.class_id));
@@ -452,9 +455,7 @@ export default function AdminDashboard() {
                                                                 <button type="button" onClick={() => handleDeleteLecture(lecture)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>Delete</button>
                                                             </div>
                                                         </div>
-                                                        {lecture.content && (
-                                                            <p style={{ color: 'var(--text-muted)', margin: '10px 0 0', fontSize: '0.88rem', lineHeight: '1.45' }}>{lecture.content}</p>
-                                                        )}
+                                                        {lecture.content && <div style={{ marginTop: '10px' }}><RichTextContent content={lecture.content} /></div>}
                                                         {lecture.resources?.length > 0 && (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginTop: '12px' }}>
                                                                 {lecture.resources.map((resource, resourceIndex) => (
@@ -462,9 +463,6 @@ export default function AdminDashboard() {
                                                                         <a href={resource.resource_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
                                                                             {resource.label || `Open Material ${resourceIndex + 1}`}
                                                                         </a>
-                                                                        <span style={{ color: 'var(--text-muted)' }}>
-                                                                            Done by: {completedUsersForResource(resource.id).length ? completedUsersForResource(resource.id).map((progress) => progress.user_name).join(', ') : 'No users yet'}
-                                                                        </span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -487,7 +485,7 @@ export default function AdminDashboard() {
                                 <h3>Class Assignments</h3>
                                 <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Choose a user and class in the assignment popup.</p>
                             </div>
-                            <button type="button" onClick={() => setModal('assign')} className="btn-primary">Assign User to Class</button>
+                            <button type="button" onClick={openAssignModal} className="btn-primary">Assign Classes to User</button>
                         </div>
                         <div style={{ marginTop: '28px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -499,8 +497,6 @@ export default function AdminDashboard() {
                                     <p style={{ color: 'var(--text-muted)' }}>No users have been assigned to a class yet.</p>
                                 ) : (
                                     data.assignments.map((assignment) => {
-                                        const status = assignmentStatus(assignment);
-                                        const complete = status === 'Complete';
                                         return (
                                             <article key={`${assignment.user_id}-${assignment.class_id}`} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                                                 <div>
@@ -510,8 +506,8 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                                     <div style={{ textAlign: 'right' }}>
-                                                        <span style={{ display: 'inline-block', color: complete ? '#86efac' : status === 'Not started' ? '#fca5a5' : 'var(--accent-color)', fontSize: '0.9rem' }}>{status}</span>
-                                                        <p style={{ color: 'var(--text-muted)', margin: '5px 0 0', fontSize: '0.85rem' }}>{assignment.completed_lectures} of {assignment.total_lectures} lectures done</p>
+                                                        <span style={{ display: 'inline-block', color: '#86efac', fontSize: '0.9rem' }}>Assigned</span>
+                                                        <p style={{ color: 'var(--text-muted)', margin: '5px 0 0', fontSize: '0.85rem' }}>{assignment.total_lectures} learning material{Number(assignment.total_lectures) === 1 ? '' : 's'} available</p>
                                                     </div>
                                                     <button type="button" onClick={() => handleRemoveAssignment(assignment)} className="btn-secondary" style={{ color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>Remove Access</button>
                                                 </div>
@@ -533,7 +529,7 @@ export default function AdminDashboard() {
                                 {modal === 'user' && (userForm.id ? 'Manage User' : 'Add User')}
                                 {modal === 'class' && 'Create Class'}
                                 {modal === 'lecture' && (lectureForm.id ? 'Edit Lecture' : 'Add Lecture')}
-                                {modal === 'assign' && 'Assign User to Class'}
+                                {modal === 'assign' && 'Assign Classes to User'}
                             </h3>
                             <button type="button" className="admin-modal-close" onClick={() => setModal(null)} aria-label="Close popup">x</button>
                         </div>
@@ -557,10 +553,16 @@ export default function AdminDashboard() {
                                     <option value="0">Inactive - access blocked</option>
                                 </select>
                                 {!userForm.id && (
-                                    <select name="class_id" value={userForm.class_id} onChange={(e) => setUserForm({ ...userForm, class_id: e.target.value })}>
-                                        <option value="">Assign a class now (optional)</option>
-                                        {data.classes.map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.title}</option>)}
-                                    </select>
+                                    <div className="class-assignment-list">
+                                        <h4>Assign Classes (optional)</h4>
+                                        <p>Select all classes this user should access.</p>
+                                        {data.classes.map((classroom) => (
+                                            <label key={classroom.id}>
+                                                <input type="checkbox" checked={userForm.class_ids.includes(String(classroom.id))} onChange={() => toggleUserClassSelection(classroom.id)} />
+                                                <span>{classroom.title}</span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 )}
                                 {userForm.id && (
                                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '18px', marginTop: '4px' }}>
@@ -576,15 +578,18 @@ export default function AdminDashboard() {
                                                 ))
                                             )}
                                         </div>
-                                        <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
-                                            <select value={userForm.class_id} onChange={(e) => setUserForm({ ...userForm, class_id: e.target.value })} style={{ flex: 1, minWidth: '200px' }}>
-                                                <option value="">Select a class to assign...</option>
-                                                {data.classes
-                                                    .filter((classroom) => !assignedClassesForUser(userForm.id).some((assignment) => String(assignment.class_id) === String(classroom.id)))
-                                                    .map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.title}</option>)}
-                                            </select>
-                                            <button type="button" onClick={handleAssignClassToUser} disabled={!userForm.class_id} className="btn-secondary" style={{ opacity: userForm.class_id ? 1 : 0.55 }}>
-                                                Assign Class
+                                        <div className="class-assignment-list" style={{ marginTop: '14px' }}>
+                                            <p>Select additional classes to assign.</p>
+                                            {data.classes
+                                                .filter((classroom) => !assignedClassesForUser(userForm.id).some((assignment) => String(assignment.class_id) === String(classroom.id)))
+                                                .map((classroom) => (
+                                                    <label key={classroom.id}>
+                                                        <input type="checkbox" checked={userForm.class_ids.includes(String(classroom.id))} onChange={() => toggleUserClassSelection(classroom.id)} />
+                                                        <span>{classroom.title}</span>
+                                                    </label>
+                                                ))}
+                                            <button type="button" onClick={handleAssignClassToUser} disabled={!userForm.class_ids.length} className="btn-secondary" style={{ marginTop: '12px', opacity: userForm.class_ids.length ? 1 : 0.55 }}>
+                                                Assign {userForm.class_ids.length || ''} Class{userForm.class_ids.length === 1 ? '' : 'es'}
                                             </button>
                                         </div>
                                     </div>
@@ -616,7 +621,11 @@ export default function AdminDashboard() {
                                     <option value="pdf">PDF Link</option>
                                     <option value="link">Other External Link</option>
                                 </select>
-                                <textarea name="content" placeholder="Lecture notes or text content..." rows={5} value={lectureForm.content} onChange={(e) => setLectureForm({ ...lectureForm, content: e.target.value })}></textarea>
+                                <RichTextEditor
+                                    value={lectureForm.content}
+                                    onChange={(content) => setLectureForm((current) => ({ ...current, content }))}
+                                    placeholder="Write lecture notes, use bullets, or create numbered steps..."
+                                />
                                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '18px', marginTop: '4px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
                                         <div>
@@ -641,15 +650,23 @@ export default function AdminDashboard() {
 
                         {modal === 'assign' && (
                             <form onSubmit={handleAssignClass} className="admin-modal-form">
-                                <select name="user_id" required>
+                                <select name="user_id" value={assignmentForm.user_id} onChange={(e) => setAssignmentForm((current) => ({ ...current, user_id: e.target.value }))} required>
                                     <option value="">Select User...</option>
                                     {data.users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
                                 </select>
-                                <select name="class_id" required>
-                                    <option value="">Select Class...</option>
-                                    {data.classes.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                                </select>
-                                <button type="submit" className="btn-primary">Assign Class</button>
+                                <div className="class-assignment-list">
+                                    <h4>Select Classes</h4>
+                                    <p>Choose one or more classes for this user.</p>
+                                    {data.classes.map((classroom) => (
+                                        <label key={classroom.id}>
+                                            <input type="checkbox" checked={assignmentForm.class_ids.includes(String(classroom.id))} onChange={() => toggleAssignmentClass(classroom.id)} />
+                                            <span>{classroom.title}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <button type="submit" disabled={!assignmentForm.user_id || !assignmentForm.class_ids.length} className="btn-primary" style={{ opacity: assignmentForm.user_id && assignmentForm.class_ids.length ? 1 : 0.55 }}>
+                                    Assign {assignmentForm.class_ids.length || ''} Class{assignmentForm.class_ids.length === 1 ? '' : 'es'}
+                                </button>
                             </form>
                         )}
                     </div>
