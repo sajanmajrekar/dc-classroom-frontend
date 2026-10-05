@@ -111,6 +111,20 @@ export default function AdminDashboard() {
         setShowUserPassword(false);
     };
 
+    // The mail API processes one request at a time, so assignments are deliberately sent sequentially.
+    const assignClasses = async (userId, classIds) => {
+        const results = [];
+        for (const classId of classIds) {
+            const response = await fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ user_id: userId, class_id: classId })
+            });
+            results.push(await response.json());
+        }
+        return results;
+    };
+
     const handleUserSubmit = async (e) => {
         e.preventDefault();
         const isEditing = Boolean(userForm.id);
@@ -124,11 +138,7 @@ export default function AdminDashboard() {
 
         let assignmentResults = [];
         if (!isEditing && classIds.length && result.user_id) {
-            assignmentResults = await Promise.all(classIds.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ user_id: result.user_id, class_id: classId })
-            }).then((assignmentResponse) => assignmentResponse.json())));
+            assignmentResults = await assignClasses(result.user_id, classIds);
         }
         resetUserForm();
         fetchUsers();
@@ -214,11 +224,7 @@ export default function AdminDashboard() {
     const handleAssignClassToUser = async () => {
         if (!userForm.id || !userForm.class_ids.length) return;
 
-        const results = await Promise.all(userForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ user_id: userForm.id, class_id: classId })
-        }).then((response) => response.json())));
+        const results = await assignClasses(userForm.id, userForm.class_ids);
         setUserForm((current) => ({ ...current, class_ids: [] }));
         fetchAssignments();
         setNotice({
@@ -321,11 +327,7 @@ export default function AdminDashboard() {
     const handleAssignClass = async (e) => {
         e.preventDefault();
         if (!assignmentForm.user_id || !assignmentForm.class_ids.length) return;
-        const results = await Promise.all(assignmentForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ user_id: assignmentForm.user_id, class_id: classId })
-        }).then((response) => response.json())));
+        const results = await assignClasses(assignmentForm.user_id, assignmentForm.class_ids);
         setAssignmentForm({ user_id: '', class_ids: [] });
         setModal(null);
         fetchAssignments();
@@ -405,6 +407,20 @@ export default function AdminDashboard() {
                                         </span>
                                     </div>
                                     <p style={{ color: 'var(--text-muted)', margin: '14px 0', textTransform: 'capitalize' }}>Role: {user.role}</p>
+                                    <div style={{ margin: '0 0 14px' }}>
+                                        <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '7px' }}>Assigned Classes</span>
+                                        {assignedClassesForUser(user.id).length === 0 ? (
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No classes assigned</span>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                                                {assignedClassesForUser(user.id).map((assignment) => (
+                                                    <span key={assignment.class_id} style={{ color: 'var(--accent-color)', border: '1px solid var(--border-color)', borderRadius: '999px', padding: '4px 8px', fontSize: '0.8rem' }}>
+                                                        {assignment.class_title}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                         <button type="button" onClick={() => handleEditUser(user)} className="btn-secondary">Manage</button>
                                         <button type="button" onClick={() => handleUserStatus(user)} className="btn-secondary" style={{ color: isUserActive(user) ? 'var(--danger-color)' : '#86efac', borderColor: isUserActive(user) ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)' }}>
