@@ -122,12 +122,13 @@ export default function AdminDashboard() {
         });
         const result = await response.json();
 
+        let assignmentResults = [];
         if (!isEditing && classIds.length && result.user_id) {
-            await Promise.all(classIds.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+            assignmentResults = await Promise.all(classIds.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ user_id: result.user_id, class_id: classId })
-            })));
+            }).then((assignmentResponse) => assignmentResponse.json())));
         }
         resetUserForm();
         fetchUsers();
@@ -135,7 +136,13 @@ export default function AdminDashboard() {
         setModal(null);
         setNotice({
             title: isEditing ? 'User updated' : 'User created',
-            message: !isEditing && classIds.length ? 'The user was created and assigned to the selected classes.' : 'The user details have been saved.'
+            message: !isEditing && !result.mail_sent
+                ? 'The user was created, but the login email could not be sent. Please check the server mail configuration.'
+                : !isEditing && classIds.length && assignmentResults.some((assignment) => assignment.new_assignment !== false && !assignment.mail_sent)
+                    ? 'The user was created and assigned to the selected classes, but one or more assignment emails could not be sent.'
+                    : !isEditing && classIds.length
+                        ? 'The user was created, assigned to the selected classes, and notified by email.'
+                        : 'The user details have been saved.'
         });
     };
 
@@ -207,14 +214,19 @@ export default function AdminDashboard() {
     const handleAssignClassToUser = async () => {
         if (!userForm.id || !userForm.class_ids.length) return;
 
-        await Promise.all(userForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+        const results = await Promise.all(userForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ user_id: userForm.id, class_id: classId })
-        })));
+        }).then((response) => response.json())));
         setUserForm((current) => ({ ...current, class_ids: [] }));
         fetchAssignments();
-        setNotice({ title: 'Classes assigned', message: 'The user can now access the selected classes.' });
+        setNotice({
+            title: 'Classes assigned',
+            message: results.some((result) => result.new_assignment !== false && !result.mail_sent)
+                ? 'The user can access the selected classes, but one or more notification emails could not be sent.'
+                : 'The user can now access the selected classes and has been notified by email.'
+        });
     };
 
     const handleCreateClass = async (e) => {
@@ -309,15 +321,20 @@ export default function AdminDashboard() {
     const handleAssignClass = async (e) => {
         e.preventDefault();
         if (!assignmentForm.user_id || !assignmentForm.class_ids.length) return;
-        await Promise.all(assignmentForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
+        const results = await Promise.all(assignmentForm.class_ids.map((classId) => fetch(`${API_BASE_URL}/admin/assign_class.php`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ user_id: assignmentForm.user_id, class_id: classId })
-        })));
+        }).then((response) => response.json())));
         setAssignmentForm({ user_id: '', class_ids: [] });
         setModal(null);
         fetchAssignments();
-        setNotice({ title: 'Classes assigned', message: 'The user can now access the selected classes.' });
+        setNotice({
+            title: 'Classes assigned',
+            message: results.some((result) => result.new_assignment !== false && !result.mail_sent)
+                ? 'The user can access the selected classes, but one or more notification emails could not be sent.'
+                : 'The user can now access the selected classes and has been notified by email.'
+        });
     };
 
     const openAssignModal = () => {
