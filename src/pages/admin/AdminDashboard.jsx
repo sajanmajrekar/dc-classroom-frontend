@@ -23,6 +23,7 @@ export default function AdminDashboard() {
         content: '',
         resources: [{ label: '', resource_url: '' }]
     });
+    const [classForm, setClassForm] = useState({ id: null, title: '', description: '' });
     const [modal, setModal] = useState(null);
     const [confirmation, setConfirmation] = useState(null);
     const [notice, setNotice] = useState(null);
@@ -75,6 +76,10 @@ export default function AdminDashboard() {
             content: '',
             resources: [{ label: '', resource_url: '' }]
         });
+    };
+
+    const resetClassForm = () => {
+        setClassForm({ id: null, title: '', description: '' });
     };
 
     const openLectureForClass = (classId) => {
@@ -235,15 +240,40 @@ export default function AdminDashboard() {
         });
     };
 
-    const handleCreateClass = async (e) => {
+    const handleClassSubmit = async (e) => {
         e.preventDefault();
-        const fd = new FormData(e.target);
-        await fetch(`${API_BASE_URL}/admin/classes.php`, {
-            method: 'POST', headers, body: JSON.stringify(Object.fromEntries(fd))
+        const isEditing = Boolean(classForm.id);
+        const response = await fetch(`${API_BASE_URL}/admin/classes.php`, {
+            method: isEditing ? 'PUT' : 'POST',
+            headers,
+            body: JSON.stringify(classForm)
         });
-        e.target.reset();
+        const result = await response.json();
+        if (result.status !== 'success') {
+            setNotice({ title: 'Unable to save class', message: result.message || 'Please try again.' });
+            return;
+        }
+        resetClassForm();
         fetchClasses();
         setModal(null);
+        setNotice({
+            title: isEditing ? 'Class updated' : 'Class created',
+            message: isEditing ? 'The classroom details have been saved.' : 'The new classroom is ready for lectures.'
+        });
+    };
+
+    const openCreateClass = () => {
+        resetClassForm();
+        setModal('class');
+    };
+
+    const openEditClass = (classroom) => {
+        setClassForm({
+            id: classroom.id,
+            title: classroom.title || '',
+            description: classroom.description || ''
+        });
+        setModal('class');
     };
 
     const deleteClass = async (classroom) => {
@@ -440,7 +470,7 @@ export default function AdminDashboard() {
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <h3>Existing Classes (Total: {data.classes.length})</h3>
-                            <button type="button" onClick={() => setModal('class')} className="btn-primary">Add Class</button>
+                            <button type="button" onClick={openCreateClass} className="btn-primary">Add Class</button>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
                             {data.classes.map((classroom) => {
@@ -465,6 +495,9 @@ export default function AdminDashboard() {
                                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
                                             <button type="button" onClick={() => openLectureForClass(classroom.id)} className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
                                                 Add Lecture
+                                            </button>
+                                            <button type="button" onClick={() => openEditClass(classroom)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                                                Edit Class
                                             </button>
                                             <button type="button" onClick={() => handleDeleteClass(classroom)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
                                                 Delete Class
@@ -560,7 +593,7 @@ export default function AdminDashboard() {
                         <div className="admin-modal-header">
                             <h3 id="admin-modal-title">
                                 {modal === 'user' && (userForm.id ? 'Manage User' : 'Add User')}
-                                {modal === 'class' && 'Create Class'}
+                                {modal === 'class' && (classForm.id ? 'Edit Class' : 'Create Class')}
                                 {modal === 'lecture' && (lectureForm.id ? 'Edit Lecture' : 'Add Lecture')}
                                 {modal === 'assign' && 'Assign Classes to User'}
                             </h3>
@@ -633,10 +666,10 @@ export default function AdminDashboard() {
                         )}
 
                         {modal === 'class' && (
-                            <form onSubmit={handleCreateClass} className="admin-modal-form">
-                                <input name="title" placeholder="Class Title" required />
-                                <textarea name="description" placeholder="Class description" rows={4}></textarea>
-                                <button type="submit" className="btn-primary">Create Class</button>
+                            <form onSubmit={handleClassSubmit} className="admin-modal-form">
+                                <input name="title" placeholder="Class Title" value={classForm.title} onChange={(e) => setClassForm((current) => ({ ...current, title: e.target.value }))} required />
+                                <textarea name="description" placeholder="Class description" rows={4} value={classForm.description} onChange={(e) => setClassForm((current) => ({ ...current, description: e.target.value }))}></textarea>
+                                <button type="submit" className="btn-primary">{classForm.id ? 'Save Class Changes' : 'Create Class'}</button>
                             </form>
                         )}
 
