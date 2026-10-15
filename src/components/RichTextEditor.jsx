@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Bold, Italic, List, ListOrdered, Palette, Highlighter } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Palette, Highlighter, Eraser } from 'lucide-react';
 
 const toEditorHtml = (value) => {
     if (!value) return '';
@@ -61,6 +61,9 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
                     <Highlighter size={16} />
                     <input type="color" aria-label="Highlight color" defaultValue="#facc15" onMouseDown={saveSelection} onChange={(event) => applyFormat('hiliteColor', event.target.value)} />
                 </label>
+                <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => applyFormat('hiliteColor', 'transparent')} aria-label="Clear text highlight" title="Transparent background">
+                    <Eraser size={16} />
+                </button>
             </div>
             <div
                 ref={editorRef}
