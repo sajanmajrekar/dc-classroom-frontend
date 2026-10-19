@@ -482,7 +482,7 @@ export default function AdminDashboard() {
                                     <section key={classroom.id} style={{ border: '1px solid var(--border-color)', borderRadius: '14px', padding: '18px', background: 'rgba(255, 255, 255, 0.02)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
                                             <div>
-                                                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{classroom.title}</h4>
+                                                <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{classroom.title}</h4>
                                                 {classroom.description && (
                                                     <p style={{ color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: '1.5' }}>{classroom.description}</p>
                                                 )}
