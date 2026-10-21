@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { GripVertical } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/api';
-import RichTextEditor, { RichTextContent } from '../../components/RichTextEditor';
+import RichTextEditor from '../../components/RichTextEditor';
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('users');
@@ -29,6 +30,8 @@ export default function AdminDashboard() {
     const [notice, setNotice] = useState(null);
     const [showUserPassword, setShowUserPassword] = useState(false);
     const [assignmentForm, setAssignmentForm] = useState({ user_id: '', class_ids: [] });
+    const [lectureListClass, setLectureListClass] = useState(null);
+    const [draggedLectureId, setDraggedLectureId] = useState(null);
 
     const token = localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -86,6 +89,50 @@ export default function AdminDashboard() {
         resetLectureForm();
         setLectureForm((current) => ({ ...current, class_id: String(classId) }));
         setModal('lecture');
+    };
+
+    const lecturesForClass = (classId) => data.lectures
+        .filter((lecture) => String(lecture.class_id) === String(classId))
+        .sort((first, second) => Number(first.sort_order || first.id) - Number(second.sort_order || second.id));
+
+    const openLectureList = (classroom) => {
+        setLectureListClass(classroom);
+        setDraggedLectureId(null);
+        setModal('lecture-list');
+    };
+
+    const reorderLectures = async (classId, sourceId, targetId) => {
+        if (!sourceId || sourceId === targetId) return;
+
+        const orderedLectures = lecturesForClass(classId);
+        const sourceIndex = orderedLectures.findIndex((lecture) => String(lecture.id) === String(sourceId));
+        const targetIndex = orderedLectures.findIndex((lecture) => String(lecture.id) === String(targetId));
+        if (sourceIndex < 0 || targetIndex < 0) return;
+
+        const nextOrder = [...orderedLectures];
+        const [movedLecture] = nextOrder.splice(sourceIndex, 1);
+        nextOrder.splice(targetIndex, 0, movedLecture);
+        const orderById = new Map(nextOrder.map((lecture, index) => [String(lecture.id), index + 1]));
+
+        setData((current) => ({
+            ...current,
+            lectures: current.lectures.map((lecture) => (
+                orderById.has(String(lecture.id))
+                    ? { ...lecture, sort_order: orderById.get(String(lecture.id)) }
+                    : lecture
+            ))
+        }));
+
+        const response = await fetch(`${API_BASE_URL}/admin/lectures.php`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ action: 'reorder', class_id: classId, lecture_ids: nextOrder.map((lecture) => lecture.id) })
+        });
+        const result = await response.json();
+        if (result.status !== 'success') {
+            fetchLectures();
+            setNotice({ title: 'Unable to save order', message: result.message || 'Please run the latest database migration and try again.' });
+        }
     };
 
     const updateLectureResource = (index, field, value) => {
@@ -472,11 +519,9 @@ export default function AdminDashboard() {
                             <h3>Existing Classes (Total: {data.classes.length})</h3>
                             <button type="button" onClick={openCreateClass} className="btn-primary">Add Class</button>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
+                        <div className="classroom-grid">
                             {data.classes.map((classroom) => {
-                                const classLectures = data.lectures.filter(
-                                    (lecture) => String(lecture.class_id) === String(classroom.id)
-                                );
+                                const classLectures = lecturesForClass(classroom.id);
 
                                 return (
                                     <section key={classroom.id} style={{ border: '1px solid var(--border-color)', borderRadius: '14px', padding: '18px', background: 'rgba(255, 255, 255, 0.02)' }}>
@@ -496,6 +541,9 @@ export default function AdminDashboard() {
                                             <button type="button" onClick={() => openLectureForClass(classroom.id)} className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
                                                 Add Lecture
                                             </button>
+                                            <button type="button" onClick={() => openLectureList(classroom)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                                                View Lectures
+                                            </button>
                                             <button type="button" onClick={() => openEditClass(classroom)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
                                                 Edit Class
                                             </button>
@@ -504,39 +552,6 @@ export default function AdminDashboard() {
                                             </button>
                                         </div>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-                                            {classLectures.length === 0 ? (
-                                                <p style={{ color: 'var(--text-muted)', margin: 0 }}>No lectures have been added yet.</p>
-                                            ) : (
-                                                classLectures.map((lecture) => (
-                                                    <article key={lecture.id} style={{ padding: '12px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border-color)' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
-                                                            <div>
-                                                                <h5 style={{ margin: 0, fontSize: '0.95rem' }}>{lecture.title}</h5>
-                                                                {lecture.subtitle && <p style={{ color: 'var(--text-muted)', margin: '5px 0 0', fontSize: '0.82rem' }}>{lecture.subtitle}</p>}
-                                                                <span style={{ display: 'block', color: 'var(--text-muted)', textTransform: 'capitalize', fontSize: '0.8rem', marginTop: '5px' }}>{lecture.type}</span>
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                                <button type="button" onClick={() => handleEditLecture(lecture)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>Edit</button>
-                                                                <button type="button" onClick={() => handleDeleteLecture(lecture)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--danger-color)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>Delete</button>
-                                                            </div>
-                                                        </div>
-                                                        {lecture.content && <div style={{ marginTop: '10px' }}><RichTextContent content={lecture.content} /></div>}
-                                                        {lecture.resources?.length > 0 && (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginTop: '12px' }}>
-                                                                {lecture.resources.map((resource, resourceIndex) => (
-                                                                    <div key={resource.id || resourceIndex} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.82rem' }}>
-                                                                        <a href={resource.resource_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
-                                                                            {resource.label || `Open Material ${resourceIndex + 1}`}
-                                                                        </a>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </article>
-                                                ))
-                                            )}
-                                        </div>
                                     </section>
                                 );
                             })}
@@ -595,6 +610,7 @@ export default function AdminDashboard() {
                                 {modal === 'user' && (userForm.id ? 'Manage User' : 'Add User')}
                                 {modal === 'class' && (classForm.id ? 'Edit Class' : 'Create Class')}
                                 {modal === 'lecture' && (lectureForm.id ? 'Edit Lecture' : 'Add Lecture')}
+                                {modal === 'lecture-list' && `Lectures: ${lectureListClass?.title || ''}`}
                                 {modal === 'assign' && 'Assign Classes to User'}
                             </h3>
                             <button type="button" className="admin-modal-close" onClick={() => setModal(null)} aria-label="Close popup">x</button>
@@ -671,6 +687,46 @@ export default function AdminDashboard() {
                                 <textarea name="description" placeholder="Class description" rows={4} value={classForm.description} onChange={(e) => setClassForm((current) => ({ ...current, description: e.target.value }))}></textarea>
                                 <button type="submit" className="btn-primary">{classForm.id ? 'Save Class Changes' : 'Create Class'}</button>
                             </form>
+                        )}
+
+                        {modal === 'lecture-list' && lectureListClass && (
+                            <div className="lecture-list-modal">
+                                <div className="lecture-list-actions">
+                                    <p>Drag lectures using the handle to change their order.</p>
+                                    <button type="button" onClick={() => openLectureForClass(lectureListClass.id)} className="btn-primary">Add Lecture</button>
+                                </div>
+                                <div className="sortable-lecture-list">
+                                    {lecturesForClass(lectureListClass.id).length === 0 ? (
+                                        <p className="sortable-lecture-empty">No lectures have been added yet.</p>
+                                    ) : (
+                                        lecturesForClass(lectureListClass.id).map((lecture, index) => (
+                                            <article
+                                                key={lecture.id}
+                                                className={`sortable-lecture-card${String(draggedLectureId) === String(lecture.id) ? ' is-dragging' : ''}`}
+                                                draggable
+                                                onDragStart={() => setDraggedLectureId(lecture.id)}
+                                                onDragOver={(event) => event.preventDefault()}
+                                                onDrop={() => {
+                                                    reorderLectures(lectureListClass.id, draggedLectureId, lecture.id);
+                                                    setDraggedLectureId(null);
+                                                }}
+                                                onDragEnd={() => setDraggedLectureId(null)}
+                                            >
+                                                <div className="sortable-lecture-handle" title="Drag to reorder"><GripVertical size={20} /></div>
+                                                <div className="sortable-lecture-copy">
+                                                    <span className="sortable-lecture-number">Lecture {String(index + 1).padStart(2, '0')}</span>
+                                                    <h4>{lecture.title}</h4>
+                                                    {lecture.subtitle && <p>{lecture.subtitle}</p>}
+                                                </div>
+                                                <div className="sortable-lecture-actions">
+                                                    <button type="button" onClick={() => handleEditLecture(lecture)} className="btn-secondary">Edit</button>
+                                                    <button type="button" onClick={() => handleDeleteLecture(lecture)} className="btn-secondary sortable-lecture-delete">Delete</button>
+                                                </div>
+                                            </article>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         )}
 
                         {modal === 'lecture' && (

@@ -85,7 +85,7 @@ export default function ClassDetail() {
                                     </div>
                                 </div>
                                 {lec.subtitle && (
-                                    <p style={{ color: 'var(--accent-color)', margin: 0, fontSize: '0.95rem', fontWeight: 500 }}>{lec.subtitle}</p>
+                                    <p style={{ color: 'var(--accent-color)', margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{lec.subtitle}</p>
                                 )}
                                 {lec.content && (
                                     <div style={{ background: 'var(--input-bg)', padding: '16px', borderRadius: '8px' }}>
