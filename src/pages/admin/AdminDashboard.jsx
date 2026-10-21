@@ -604,7 +604,7 @@ export default function AdminDashboard() {
 
             {modal && (
                 <div className="admin-modal-backdrop" role="presentation" onMouseDown={() => setModal(null)}>
-                    <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title" onMouseDown={(e) => e.stopPropagation()}>
+                    <div className={`admin-modal${modal === 'lecture-list' ? ' admin-lecture-list-modal' : ''}`} role="dialog" aria-modal="true" aria-labelledby="admin-modal-title" onMouseDown={(e) => e.stopPropagation()}>
                         <div className="admin-modal-header">
                             <h3 id="admin-modal-title">
                                 {modal === 'user' && (userForm.id ? 'Manage User' : 'Add User')}

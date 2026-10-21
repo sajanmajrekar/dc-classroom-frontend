@@ -392,6 +392,10 @@ input:focus, textarea:focus, select:focus {
   gap: 16px;
 }
 
+.admin-lecture-list-modal {
+  width: min(100%, 1080px);
+}
+
 .lecture-list-actions {
   display: flex;
   align-items: center;
@@ -409,9 +413,9 @@ input:focus, textarea:focus, select:focus {
 }
 
 .sortable-lecture-list {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   max-height: min(56vh, 540px);
-  flex-direction: column;
   gap: 10px;
   overflow-y: auto;
   padding-right: 4px;
@@ -497,6 +501,10 @@ input:focus, textarea:focus, select:focus {
   .lecture-list-actions,
   .sortable-lecture-card {
     align-items: flex-start;
+  }
+
+  .sortable-lecture-list {
+    grid-template-columns: 1fr;
   }
 
   .lecture-list-actions {
